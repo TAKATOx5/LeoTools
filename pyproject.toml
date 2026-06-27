@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leotools"
+version = "0.1.0"
+description = "LeoTools - Herramientas para automatización"
+requires-python = ">=3.9"
+dependencies = [
+    "typer[all]>=0.9.0",
+]
+
+[project.scripts]
+lt = "leotools.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["leotools*"]
