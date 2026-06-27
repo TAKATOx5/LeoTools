@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-00FF00?style=for-the-badge)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)](https://github.com/erikldev/leotools)
+[![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)](https://github.com/TAKATOx5/LeoTools)
 
 ---
 
@@ -16,7 +16,7 @@
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/erikldev/leotools.git
+git clone https://github.com/TAKATOx5/LeoTools.git
 cd leotools
 
 # Crear entorno virtual
@@ -147,7 +147,7 @@ app.add_typer(nuevo_comando.app, name="nuevo-comando")
 
 ## Roadmap
 
-- [ ] `lt img2pdf` - Convertir imagenes a PDF
+- [x] `lt img2pdf` - Convertir imagenes a PDF
 - [ ] `lt pdf2img` - Extraer imagenes de PDF
 - [ ] `lt rename` - Renombrar archivos en lote
 - [ ] `lt resize` - Redimensionar imagenes
