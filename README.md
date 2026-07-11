@@ -40,7 +40,7 @@ lt [comando] [opciones]
 
 ### `lt img2pdf`
 
-Convierte imagenes a PDF con opciones de mejora.
+Convierte imagenes a PDF con interfaz interactiva, progreso en vivo y opciones de mejora.
 
 | Opcion | Descripcion |
 |--------|-------------|
@@ -49,6 +49,15 @@ Convierte imagenes a PDF con opciones de mejora.
 | `--quality, -q` | Calidad: `original`, `media`, `baja` |
 | `--enhance, -e` | Mejorar imagen (ver abajo) |
 | `--open, -a` | Abrir PDF al terminar |
+| `??` | Mostrar ayuda detallada |
+
+#### Caracteristicas dinamicas
+
+- **Tabla con dimensiones**: Muestra ancho x alto de cada imagen, tamano y fecha
+- **Barra de progreso**: Indicador visual mientras se procesan las imagenes
+- **Panel de resumen**: Muestra calidad, mejora aplicada y destino antes de generar
+- **Confirmacion final**: Tamano del PDF generado y ubicacion exacta
+- **Prompts con validacion**: Entrada de datos con valores por defecto y opciones guiadas
 
 #### Modos de mejora (`--enhance`)
 
@@ -62,29 +71,32 @@ Convierte imagenes a PDF con opciones de mejora.
 #### Ejemplos
 
 ```bash
-# Modo interactivo
+# Modo interactivo (guiado paso a paso)
 lt img2pdf
 
-# Crear PDF con opciones
-lt img2pdf -o asistencia.pdf -s date -q media
+# Modo automatico (sin preguntas)
+lt img2pdf -o asistencia.pdf
+
+# Ordenado por fecha, calidad media
+lt img2pdf -o tarea.pdf -s date -q media
 
 # Mejorar fotos con sombras
 lt img2pdf -o lista.pdf -e shadows
 
-# Blanco y negro para documentos
+# Blanco y negro para documentos escaneados
 lt img2pdf -o reporte.pdf -e binarize
 
 # Todo junto + abrir al terminar
 lt img2pdf -o final.pdf -e all -s date --open
 ```
 
-#### Orden manual (modo interactivo)
+#### Orden manual (solo interactivo)
 
 ```
 2,1,4,3       Orden especifico
 5-8,1,3       Rangos
 3,2,1,5-8     Mezcla
-Enter          Mismo orden
+Enter          Mismo orden (default)
 ```
 
 ---
