@@ -6,7 +6,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
-app = typer.Typer(help="Abre mei en Opera.", invoke_without_command=True)
+app = typer.Typer(help="Seguimiento al desarrollo de Novedades MeiMei.", invoke_without_command=True)
 
 console = Console()
 

@@ -15,7 +15,7 @@ from rich.prompt import Prompt, IntPrompt
 from rich import box
 from rich.text import Text
 
-app = typer.Typer(help="Convierte imagenes a PDF.", invoke_without_command=True)
+app = typer.Typer(help="Convierte imagenes de la carpeta actual a un PDF.", invoke_without_command=True)
 
 console = Console()
 

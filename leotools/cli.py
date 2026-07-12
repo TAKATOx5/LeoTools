@@ -3,7 +3,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from leotools.commands import domicilios, img2pdf, mei, update
+from leotools.commands import code, domicilios, img2pdf, mei, update
 
 console = Console()
 
@@ -43,18 +43,23 @@ def show_guide():
     table.add_column("Para que sirve")
     table.add_column("Ejemplo", style="dim")
     table.add_row(
+        "code",
+        "Abre VS Code con proyectos (ligero / scopio: local + SSH)",
+        "lt code ligero",
+    )
+    table.add_row(
         "img2pdf",
         "Convierte imagenes de la carpeta actual a un PDF",
         "lt img2pdf -o clase.pdf",
     )
     table.add_row(
         "domicilios",
-        "Abre en Opera las URLs de domicilios (mkt/dev/all)",
+        "Seguimiento a la plataforma Domicilios Fiscales",
         "lt domicilios -a",
     )
     table.add_row(
         "mei",
-        "Abre en Opera las URLs del proyecto mei (dev/all)",
+        "Seguimiento al desarrollo de Novedades MeiMei",
         "lt mei -d",
     )
     table.add_row(
@@ -83,6 +88,11 @@ def root(
         show_guide()
         raise typer.Exit()
 
+
+app.add_typer(
+    code.app,
+    name="code",
+)
 
 app.add_typer(
     img2pdf.app,
