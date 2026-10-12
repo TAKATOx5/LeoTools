@@ -3,7 +3,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from leotools.commands import code, domicilios, img2pdf, mei, update
+from leotools.commands import code, db, domicilios, drop, git, hills, img2pdf, jsoncmp, mei, update
 
 console = Console()
 
@@ -48,9 +48,34 @@ def show_guide():
         "lt code ligero",
     )
     table.add_row(
+        "db",
+        "Bases de datos MySQL: import/export interactivo y drop de datos",
+        "lt db",
+    )
+    table.add_row(
+        "drop",
+        "Borra los DATOS de las tablas e importa un .sql en 1 paso",
+        "lt drop tables -d baseproject --path=dump.sql",
+    )
+    table.add_row(
+        "git",
+        "Automatiza add + commit + push en el proyecto actual",
+        'lt git push "mensaje"',
+    )
+    table.add_row(
+        "hills",
+        "Conecta/reconecta a la red WiFi SL_Hills sin pedir contraseña",
+        "lt hills",
+    )
+    table.add_row(
         "img2pdf",
         "Convierte imagenes de la carpeta actual a un PDF",
         "lt img2pdf -o clase.pdf",
+    )
+    table.add_row(
+        "jsoncmp",
+        "Compara dos archivos JSON y muestra sus diferencias",
+        "lt jsoncmp a.json b.json",
     )
     table.add_row(
         "domicilios",
@@ -95,13 +120,35 @@ app.add_typer(
 )
 
 app.add_typer(
+    db.app,
+    name="db",
+)
+
+app.add_typer(
+    drop.app,
+    name="drop",
+)
+
+app.add_typer(
     img2pdf.app,
     name="img2pdf",
 )
 
+app.command(name="jsoncmp")(jsoncmp.run)
+
 app.add_typer(
     domicilios.app,
     name="domicilios",
+)
+
+app.add_typer(
+    git.app,
+    name="git",
+)
+
+app.add_typer(
+    hills.app,
+    name="hills",
 )
 
 app.add_typer(

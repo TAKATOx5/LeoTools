@@ -101,6 +101,41 @@ Enter          Mismo orden (default)
 
 ---
 
+### `lt jsoncmp`
+
+Compara dos archivos JSON (por ejemplo, dos exportaciones de IDs/descripciones) y muestra que claves faltan y que valores cambiaron.
+
+| Opcion | Descripcion |
+|--------|-------------|
+| `ARCHIVO_A` | Primer archivo JSON |
+| `ARCHIVO_B` | Segundo archivo JSON |
+| `--output, -o` | Guarda el reporte de diferencias en un JSON |
+| `--limit, -l` | Maximo de diferencias a mostrar (0 = todas) |
+
+#### Que detecta
+
+- **Solo en A / Solo en B**: claves (IDs) que existen en un archivo y no en el otro
+- **Valor distinto**: claves presentes en ambos con contenido diferente (incluye cambios anidados)
+- **Sin cambios**: claves identicas
+
+#### Ejemplos
+
+```bash
+# Comparar los archivos por defecto
+lt jsoncmp
+
+# Comparar dos archivos concretos
+lt jsoncmp a.json b.json
+
+# Exportar el reporte completo a un archivo
+lt jsoncmp a.json b.json -o diferencias.json
+
+# Mostrar todas las diferencias en pantalla
+lt jsoncmp a.json b.json -l 0
+```
+
+---
+
 ### `lt update`
 
 Actualiza LeoTools desde GitHub.
@@ -109,6 +144,35 @@ Actualiza LeoTools desde GitHub.
 lt update           # Descargar ultima version
 lt update --check   # Solo verificar si hay actualizaciones
 ```
+
+---
+
+### `lt git`
+
+Automatiza `git add` + `git commit` + `git push` en el proyecto actual (la carpeta donde estes parado).
+
+| Opcion | Descripcion |
+|--------|-------------|
+| `MENSAJE` | Mensaje del commit (posicional o `-m`) |
+| `DESCRIPCION` | Cuerpo del commit, opcional (posicional o `-d`) |
+
+#### Ejemplos
+
+```bash
+# Guardar y subir con un mensaje
+lt git push "Init rework paselista"
+
+# Con descripcion (cuerpo del commit)
+lt git push "Init rework paselista" "Se agregan docs de RRHH"
+
+# Con banderas
+lt git push -m "Fix login" -d "Corrige validacion de token"
+
+# Sin argumentos: pregunta el mensaje
+lt git push
+```
+
+Si el remoto no tiene upstream, lo configura automaticamente (`git push -u origin <rama>`).
 
 ---
 
@@ -160,6 +224,7 @@ app.add_typer(nuevo_comando.app, name="nuevo-comando")
 ## Roadmap
 
 - [x] `lt img2pdf` - Convertir imagenes a PDF
+- [x] `lt jsoncmp` - Comparar dos archivos JSON
 - [ ] `lt pdf2img` - Extraer imagenes de PDF
 - [ ] `lt rename` - Renombrar archivos en lote
 - [ ] `lt resize` - Redimensionar imagenes
