@@ -1,7 +1,8 @@
 import typer
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from leotools.commands import (
     code,
@@ -24,100 +25,48 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-GUIDE = f"""
-[bold cyan]LeoTools[/bold cyan] - Conjunto de utilidades de linea de comandos
-
-[bold]Que es?[/bold]
-Una coleccion de comandos utiles para convertir imagenes a PDF, abrir tus
-proyectos en Opera y mantener la propia herramienta actualizada.
-
-[bold]Como ejecutarla[/bold]
-  Instalada (disponible en cualquier carpeta):
-    [green]lt <comando>[/green]            Ej: lt img2pdf
-  Sin instalar (desde la carpeta del proyecto):
-    [green]python -m leotools <comando>[/green]
-
-  Ayuda de un comando:
-    [green]lt <comando> ??[/green]         Ej: lt domicilios ??
-    [green]lt <comando> --help[/green]
-
-[bold]Comandos disponibles[/bold]
-"""
-
-
 def show_guide():
+    header = Text()
+    header.append("LeoTools", style="bold cyan")
+    header.append(" · Herramientas de automatizacion en Python\n\n")
+    header.append("  lt <comando>        ", style="green")
+    header.append("Ejecutar desde cualquier carpeta\n", style="dim")
+    header.append("  lt <comando> ??     ", style="green")
+    header.append("Ayuda detallada de un comando", style="dim")
+
     table = Table(
         show_header=True,
         header_style="bold bright_blue",
         box=None,
+        pad_edge=False,
+        padding=(0, 1),
     )
-    table.add_column("Comando", style="green")
-    table.add_column("Para que sirve")
-    table.add_column("Ejemplo", style="dim")
-    table.add_row(
-        "code",
-        "Abre VS Code con proyectos (ligero / scopio: local + SSH)",
-        "lt code ligero",
-    )
-    table.add_row(
-        "db",
-        "Bases de datos MySQL: import/export interactivo y drop de datos",
-        "lt db",
-    )
-    table.add_row(
-        "drop",
-        "Borra los DATOS de las tablas e importa un .sql en 1 paso",
-        "lt drop tables -d baseproject --path=dump.sql",
-    )
-    table.add_row(
-        "git",
-        "Automatiza add + commit + push en el proyecto actual",
-        'lt git push "mensaje"',
-    )
-    table.add_row(
-        "hills",
-        "Conecta/reconecta a la red WiFi SL_Hills sin pedir contraseña",
-        "lt hills",
-    )
-    table.add_row(
-        "img2pdf",
-        "Convierte imagenes de la carpeta actual a un PDF",
-        "lt img2pdf -o clase.pdf",
-    )
-    table.add_row(
-        "jsoncmp",
-        "Compara dos archivos JSON y muestra sus diferencias",
-        "lt jsoncmp a.json b.json",
-    )
-    table.add_row(
-        "speedtest",
-        "Mide velocidad, latencia y bufferbloat de tu conexion",
-        "lt speedtest --quick",
-    )
-    table.add_row(
-        "domicilios",
-        "Seguimiento a la plataforma Domicilios Fiscales",
-        "lt domicilios -a",
-    )
-    table.add_row(
-        "mei",
-        "Seguimiento al desarrollo de Novedades MeiMei",
-        "lt mei -d",
-    )
-    table.add_row(
-        "update",
-        "Baja/sube cambios de LeoTools con Git/GitHub",
-        "lt update -p -m \"cambios\"",
-    )
+    table.add_column("Comando", style="green", no_wrap=True)
+    table.add_column("Que hace", no_wrap=True)
+    table.add_column("Ejemplo", style="dim", no_wrap=True)
+    rows = [
+        ("img2pdf", "Imagenes de la carpeta a PDF", "lt img2pdf -o clase.pdf"),
+        ("speedtest", "Velocidad y bufferbloat", "lt speedtest --quick"),
+        ("jsoncmp", "Diferencias entre dos JSON", "lt jsoncmp a.json b.json"),
+        ("db", "MySQL: import / export", "lt db"),
+        ("drop", "Borra datos e importa .sql", "lt drop tables -p x.sql"),
+        ("code", "VS Code local + SSH", "lt code ligero"),
+        ("hills", "WiFi SL_Hills", "lt hills"),
+        ("domicilios", "Panel Domicilios (Opera)", "lt domicilios -a"),
+        ("mei", "Panel MeiMei (Opera)", "lt mei -d"),
+        ("git", "add + commit + push", 'lt git push "msg"'),
+        ("update", "Actualiza LeoTools", "lt update"),
+    ]
+    for command, description, example in rows:
+        table.add_row(command, description, example)
 
-    console.print(Panel(GUIDE, title="Guia de LeoTools", border_style="cyan", expand=False))
-    console.print(table)
     console.print(
         Panel(
-            "[dim]Tip: usa [green]lt ??[/green] para ver esta guia y "
-            "[green]lt <comando> ??[/green] para ayuda especifica de cada comando.[/dim]",
+            Group(header, Text(""), table),
+            title="LeoTools",
             border_style="cyan",
             expand=False,
+            padding=(0, 2),
         )
     )
 
