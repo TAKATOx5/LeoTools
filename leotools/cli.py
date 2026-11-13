@@ -3,7 +3,19 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from leotools.commands import code, db, domicilios, drop, git, hills, img2pdf, jsoncmp, mei, update
+from leotools.commands import (
+    code,
+    db,
+    domicilios,
+    drop,
+    git,
+    hills,
+    img2pdf,
+    jsoncmp,
+    mei,
+    speedtest,
+    update,
+)
 
 console = Console()
 
@@ -78,6 +90,11 @@ def show_guide():
         "lt jsoncmp a.json b.json",
     )
     table.add_row(
+        "speedtest",
+        "Mide velocidad, latencia y bufferbloat de tu conexion",
+        "lt speedtest --quick",
+    )
+    table.add_row(
         "domicilios",
         "Seguimiento a la plataforma Domicilios Fiscales",
         "lt domicilios -a",
@@ -135,6 +152,11 @@ app.add_typer(
 )
 
 app.command(name="jsoncmp")(jsoncmp.run)
+
+app.add_typer(
+    speedtest.app,
+    name="speedtest",
+)
 
 app.add_typer(
     domicilios.app,

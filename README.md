@@ -66,6 +66,7 @@ lt [comando] [opciones]
 |---------|-------------|
 | `lt img2pdf` | Convierte imagenes de la carpeta actual a un PDF |
 | `lt jsoncmp` | Compara dos archivos JSON y muestra sus diferencias |
+| `lt speedtest` | Mide velocidad, latencia y bufferbloat de tu conexion |
 | `lt db` | Bases de datos MySQL (import, export, drop, reset) |
 | `lt drop` | Borra los datos de las tablas e importa un `.sql` en un paso |
 | `lt code` | Abre VS Code con los proyectos (local + SSH) |
@@ -177,8 +178,61 @@ lt jsoncmp a.json b.json -l 0
 
 ---
 
-### `lt db`
+### `lt speedtest`
 
+Mide tu conexion real contra **Cloudflare** (sin publicidad ni telemetria):
+latencia, jitter, descarga, subida y **bufferbloat** (latencia bajo carga),
+que es lo que las webs tipicas no muestran.
+
+| Opcion | Descripcion |
+|--------|-------------|
+| `--quick, -q` | Prueba rapida (5s por sentido, 4 conexiones) |
+| `--full, -f` | Prueba exhaustiva (20s por sentido, 8 conexiones) |
+| `--duration, -t` | Duracion en segundos por sentido |
+| `--streams, -s` | Conexiones en paralelo |
+| `--no-upload` | Omitir la subida |
+| `--ipv4, -4` / `--ipv6, -6` | Forzar familia de IP |
+| `--engine, -e` | `python` (default) o `curl` (enlaces >1 Gbps) |
+| `--history, -H N` | Ver las ultimas N mediciones |
+| `--compare, -c` | Comparar con la medicion anterior |
+| `--plan, -p` | Plan contratado en Mbps (`BAJADA/SUBIDA`) |
+| `--min-down` / `--min-up` | Umbrales; sale con codigo 2 si no se cumplen |
+| `??` | Mostrar ayuda detallada |
+
+#### Que mide
+
+- **Ping**: min / mediana / p95 / maximo de 20 sondas
+- **Jitter**: variacion media entre RTTs consecutivos
+- **Descarga y subida**: streams paralelos, descartando el arranque (slow start),
+  con promedio estable, p90 y pico sostenido
+- **Bufferbloat**: latencia cargada menos latencia en reposo, con nota A–F
+- **Contexto**: DNS, TTFB, PoP de Cloudflare y IP publica
+
+#### Ejemplos
+
+```bash
+# Test equilibrado (10s + 10s)
+lt speedtest
+
+# Rapido, sin subida
+lt speedtest --quick --no-upload
+
+# Comparar con la anterior y ver % del plan
+lt speedtest --compare --plan 500/50
+
+# Historial de las ultimas 10 mediciones
+lt speedtest --history 10
+
+# Automatizacion: falla (exit 2) si no llega al minimo
+lt speedtest --min-down 300 --min-up 30
+```
+
+El historial se guarda en `%LOCALAPPDATA%\LeoTools\speedtest.jsonl`
+(en Linux: `~/.local/share/leotools`), sin enviar nada a Internet.
+
+---
+
+### `lt db`
 Gestiona bases de datos MySQL de XAMPP (import, export, drop de datos y reset de estructura).
 
 Sin argumentos abre un flujo interactivo que pregunta la base, la accion y el archivo.
@@ -421,10 +475,24 @@ LeoTools/
 │   │   ├── img2pdf.py
 │   │   ├── jsoncmp.py
 │   │   ├── mei.py
+│   │   ├── speedtest.py
 │   │   └── update.py
 │   └── utils/
 │       ├── browser.py
-│       └── files.py
+│       ├── files.py
+│       └── speedtest/
+│           ├── __init__.py
+│           ├── cloudflare.py
+│           ├── curl_engine.py
+│           ├── engine.py
+│           ├── history.py
+│           ├── metrics.py
+│           ├── models.py
+│           ├── probes.py
+│           ├── render.py
+│           └── system.py
+├── tests/
+│   └── test_speedtest_metrics.py
 ├── pyproject.toml
 ├── requirements.txt
 └── README.md
@@ -460,10 +528,19 @@ app.add_typer(nuevo_comando.app, name="nuevo-comando")
 
 ---
 
+## Pruebas
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+---
+
 ## Roadmap
 
 - [x] `lt img2pdf` - Convertir imagenes a PDF
 - [x] `lt jsoncmp` - Comparar dos archivos JSON
+- [x] `lt speedtest` - Medir velocidad, latencia y bufferbloat
 - [x] `lt db` - Import/export/drop/reset de MySQL (XAMPP)
 - [x] `lt drop` - Borrar datos e importar un dump en un paso
 - [x] `lt code` - Abrir proyectos en VS Code (local + SSH)

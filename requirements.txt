@@ -2,3 +2,4 @@ typer[all]>=0.9.0
 Pillow>=10.0.0
 PyMySQL>=1.1.0
 rich>=13.0.0
+aiohttp>=3.9.0
