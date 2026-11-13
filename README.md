@@ -229,7 +229,7 @@ lt speedtest --min-down 300 --min-up 30
 ```
 
 > Si Cloudflare limita las peticiones (HTTP 429), la prueba baja automaticamente
-> a un espejo (Hetzner US u OVH) y lo avisa en el resultado.
+> a un espejo (Hetzner US, Vultr u OVH) y lo avisa en el resultado.
 > El historial se guarda en `%LOCALAPPDATA%\LeoTools\speedtest.jsonl`
 > (en Linux: `~/.local/share/leotools`), sin enviar nada a Internet.
 
@@ -237,51 +237,61 @@ lt speedtest --min-down 300 --min-up 30
 
 ### `lt monitor`
 
-Dashboard a pantalla completa que mide mientras esta abierto y anima un gato
-ASCII segun la velocidad de descarga. Al salir muestra el resumen de la sesion.
+Dashboard a pantalla completa que mide mientras esta abierto, rota entre varios
+servidores y anima un gato ASCII segun la velocidad de descarga. Al salir
+muestra el resumen de la sesion.
 
 | Modo | Comportamiento | Uso |
 |------|----------------|-----|
-| `cycle` | 4s midiendo / 6s descansando | Uso normal |
+| `cycle` | 4s midiendo / 2s descansando | Uso normal |
 | `continuous` | Mide sin descanso | Maximo real (consume mucho ancho de banda) |
-| `sample` | 3s cada 27s | Consumo minimo |
+| `sample` | 3s cada 15s | Consumo minimo |
 
 Se puede cambiar de modo **en caliente** sin cerrar el panel.
+
+#### Rotacion de servidores
+
+Entre cada medicion rota automaticamente entre **Cloudflare, Hetzner US,
+Vultr LAX y OVH**. Si un servidor devuelve `429`, se bloquea temporalmente y
+el panel continua con el siguiente, para aprovechar el tiempo de espera.
+
+El panel muestra **siempre** el historial de la sesion: hora, fuente, bajada
+y ping de las ultimas 6 mediciones.
 
 | Tecla | Accion |
 |-------|--------|
 | `Esc` / `Ctrl+C` | Salir y ver resumen |
 | `p` | Pausar / reanudar |
 | `m` | Cambiar de modo (ciclico → continuo → muestreo) |
-| `1` / `2` / `3` | Elegir modo directamente |
+| `1` | Modo ciclico |
+| `2` | Modo continuo |
+| `3` | Modo muestreo |
 | `[` / `]` | Menos / mas descanso |
 
 | Opcion | Descripcion |
 |--------|-------------|
 | `--mode, -m` | Modo inicial: `cycle`, `continuous`, `sample` |
-| `--streams, -s` | Conexiones en paralelo (default: 6) |
+| `--streams, -s` | Conexiones en paralelo (default: 4) |
 | `--burst, -b` | Segundos midiendo por ciclo |
 | `--rest, -r` | Segundos de descanso por ciclo |
 
 #### Ejemplos
 
 ```bash
-# Dashboard normal
+# Dashboard normal (rota servidores)
 lt monitor
 
 # Sin descanso (ojo con el consumo)
 lt monitor --mode continuous
 
-# Muestreo ligero cada 27s
+# Muestreo ligero cada 15s
 lt monitor --mode sample
 
 # Mas conexiones y bloques de 6s
-lt monitor --streams 8 --burst 6
+lt monitor --streams 6 --burst 6
 ```
 
-> `monitor` no guarda historial: esta pensado para observar en vivo.
-> Si Cloudflare responde `429`, el panel cambia solo a un espejo (Hetzner/OVH)
-> y muestra `fuente ...` en la barra de estado.
+> `monitor` no guarda historial en disco: el historial es de la sesion actual.
 > El modo `continuous` puede descargar decenas de GB por hora.
 
 ---

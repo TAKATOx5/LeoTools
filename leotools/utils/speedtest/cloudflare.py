@@ -21,6 +21,7 @@ SAMPLE_INTERVAL = 0.1
 
 FALLBACK_SOURCES = [
     ("Hetzner US", "https://ash-speed.hetzner.com/100MB.bin"),
+    ("Vultr LAX", "https://lax-ca-us-ping.vultr.com/vultr.com.100MB.bin"),
     ("OVH", "https://proof.ovh.net/files/100Mb.dat"),
 ]
 
@@ -96,11 +97,13 @@ async def _sample_loop(
 
 async def _finish(workers: list[asyncio.Task], duration: float) -> None:
     """Espera a los workers y corta los que sigan con la conexion abierta."""
-    await asyncio.wait(workers, timeout=duration + 0.3)
-    for task in workers:
-        if not task.done():
-            task.cancel()
-    await asyncio.gather(*workers, return_exceptions=True)
+    try:
+        await asyncio.wait(workers, timeout=duration + 0.3)
+    finally:
+        for task in workers:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*workers, return_exceptions=True)
 
 
 async def download(
@@ -139,7 +142,7 @@ async def download(
                             return
             except asyncio.CancelledError:
                 raise
-            except (aiohttp.ClientError, asyncio.TimeoutError, OSError, EngineError):
+            except Exception:
                 errors += 1
                 await asyncio.sleep(0.2)
 
@@ -203,7 +206,7 @@ async def upload(
                         raise EngineError(f"HTTP {resp.status}")
             except asyncio.CancelledError:
                 raise
-            except (aiohttp.ClientError, asyncio.TimeoutError, OSError, EngineError):
+            except Exception:
                 errors += 1
                 await asyncio.sleep(0.2)
 

@@ -28,25 +28,28 @@ HELP_TEXT = f"""
 [bold {ACCENT}]lt monitor[/bold {ACCENT}] - Dashboard en vivo con gato animado
 
 [bold]Que hace:[/bold]
-  Mide la descarga en bucle mientras el panel esta abierto y anima un gato
-  segun la velocidad. Al salir muestra el resumen de la sesion.
+  Rota entre 4 servidores (Cloudflare, Hetzner, Vultr y OVH) entre cada
+  medicion para evitar los limites 429. Mide en bucle, anima un gato segun
+  la velocidad y muestra el historial de la sesion mientras esta abierto.
 
-[bold]Uso:[/bold]
-  [green]lt monitor[/green]                    Modo ciclico (4s mide / 6s descansa)
+[bold]Modos:[/bold]
+  [green]lt monitor[/green]                    Ciclico (4s mide / 2s descansa)
   [green]lt monitor --mode continuous[/green]  Sin descanso (usa mas ancho de banda)
-  [green]lt monitor --mode sample[/green]      Mide 3s cada 27s
-  [green]lt monitor --streams 8[/green]        Conexiones en paralelo
+  [green]lt monitor --mode sample[/green]      Mide 3s cada 15s
+  [green]lt monitor --streams 6[/green]        Conexiones en paralelo
 
 [bold]Teclas:[/bold]
-  [green]Esc / Ctrl+C[/green]   Salir y ver resumen
-  [green]p[/green]              Pausar / reanudar
+  [green]Esc / Ctrl+C[/green]   Salir y ver el resumen de la sesion
+  [green]p[/green]              Pausar / reanudar la medicion
   [green]m[/green]              Cambiar de modo (ciclico -> continuo -> muestreo)
-  [green]1 / 2 / 3[/green]      Elegir modo directamente
-  [green][ / ][/green]          Menos / mas descanso
+  [green]1[/green]              Modo ciclico (mide y descansa)
+  [green]2[/green]              Modo continuo (sin descanso)
+  [green]3[/green]              Modo muestreo (mediciones espaciadas)
+  [green][ / ][/green]          Menos / mas segundos de descanso
 
 [bold]Opciones:[/bold]
   --mode, -m       cycle | continuous | sample
-  --streams, -s    Conexiones en paralelo (default: 6)
+  --streams, -s    Conexiones en paralelo (default: 4)
   --burst, -b      Segundos midiendo por ciclo
   --rest, -r       Segundos de descanso por ciclo
 """
@@ -98,6 +101,10 @@ def main(
     table.add_row("Promedio", metrics.format_mbps(summary["avg"]))
     table.add_row("Datos", metrics.human_bytes(summary["bytes"]))
     table.add_row("Ciclos", str(summary["cycles"]))
+    if summary["sources"]:
+        table.add_row("Fuentes", ", ".join(summary["sources"]))
+    if summary["throttled"]:
+        table.add_row("429", str(summary["throttled"]))
     if summary["errors"]:
         table.add_row("Errores", str(summary["errors"]))
 

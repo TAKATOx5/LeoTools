@@ -1,11 +1,14 @@
-"""Dashboard TUI con medicion continua y gato animado."""
+"""Dashboard TUI con medicion continua, rotacion de servidores y gato animado."""
 
 import asyncio
 import time
 import traceback
+from collections import deque
 from contextlib import suppress
 from datetime import datetime
 
+from rich import box
+from rich.table import Table
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -16,9 +19,9 @@ from .models import EngineError
 
 MODES = ("cycle", "continuous", "sample")
 MODE_LABELS = {"cycle": "ciclico", "continuous": "continuo", "sample": "muestreo"}
-PRESETS = {"cycle": (4, 6), "continuous": (5, 0), "sample": (3, 27)}
-
+PRESETS = {"cycle": (4, 2), "continuous": (5, 0), "sample": (3, 15)}
 SOURCES = [("Cloudflare", None), *cloudflare.FALLBACK_SOURCES]
+HISTORY_SIZE = 6
 
 
 def format_duration(seconds: float) -> str:
@@ -30,8 +33,27 @@ def format_duration(seconds: float) -> str:
     return f"{minutes:02d}:{secs:02d}"
 
 
+def keys_text() -> Text:
+    text = Text()
+    legend = [
+        ("Esc", "salir"),
+        ("p", "pausar"),
+        ("m", "cambiar modo"),
+        ("1", "ciclico"),
+        ("2", "continuo"),
+        ("3", "muestreo"),
+        ("[ ]", "descanso"),
+    ]
+    for index, (key, label) in enumerate(legend):
+        if index:
+            text.append("   ", style="dim")
+        text.append(key, style="bold cyan")
+        text.append(f" {label}", style="dim")
+    return text
+
+
 class MonitorApp(App):
-    """Panel en vivo: mide, anima al gato y permite cambiar de modo."""
+    """Panel en vivo: rota servidores, mide, anima al gato y guarda historial."""
 
     CSS = """
     Screen {
@@ -39,19 +61,27 @@ class MonitorApp(App):
         layout: vertical;
     }
     #speed {
-        height: 3;
+        height: 2;
         content-align: center middle;
     }
     #spark {
-        height: 3;
+        height: 2;
         content-align: center middle;
     }
     #cat {
-        height: 11;
+        height: 6;
         content-align: center middle;
+    }
+    #history {
+        height: 7;
+        padding: 0 2;
     }
     #status {
         height: 3;
+        content-align: center middle;
+    }
+    #keys {
+        height: 2;
         content-align: center middle;
     }
     Footer {
@@ -62,8 +92,8 @@ class MonitorApp(App):
     BINDINGS = [
         Binding("escape", "quit", "Salir"),
         Binding("ctrl+c", "quit", "Salir"),
-        Binding("p", "toggle_pause", "Pausa"),
-        Binding("m", "cycle_mode", "Modo"),
+        Binding("p", "toggle_pause", "Pausar"),
+        Binding("m", "cycle_mode", "Cambiar modo"),
         Binding("1", "mode_cycle", "Ciclico"),
         Binding("2", "mode_continuous", "Continuo"),
         Binding("3", "mode_sample", "Muestreo"),
@@ -90,18 +120,24 @@ class MonitorApp(App):
         self.ping: float | None = None
         self.server = "Conectando..."
         self.series: list[float] = []
+        self.history: deque[dict] = deque(maxlen=HISTORY_SIZE)
+        self.history_dirty = True
         self.cycles = 0
         self.errors = 0
+        self.throttled = 0
         self.bytes_total = 0
         self.measured_seconds = 0.0
-        self.throttled = 0
-        self.cooldown = 0
-        self.source_index = 0
-        self.source_name = SOURCES[0][0]
+        self.sources_used: list[str] = []
         self.last_error = ""
+
         self.paused = False
         self.resting = False
         self.phase = "Iniciando"
+
+        self.source_index = 0
+        self.source_name = SOURCES[0][0]
+        self.rotation_pos = 0
+        self.block_until = [0.0 for _ in SOURCES]
 
         self.started = time.monotonic()
         self._last_spark = 0.0
@@ -115,7 +151,9 @@ class MonitorApp(App):
         yield Static(id="speed")
         yield Static(id="spark")
         yield Static(id="cat")
+        yield Static(id="history")
         yield Static(id="status")
+        yield Static(keys_text(), id="keys")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -147,6 +185,21 @@ class MonitorApp(App):
         except OSError:
             pass
 
+    def _pick_source(self) -> tuple[int, str, str | None] | None:
+        now = time.monotonic()
+        for offset in range(len(SOURCES)):
+            index = (self.rotation_pos + offset) % len(SOURCES)
+            if self.block_until[index] <= now:
+                self.rotation_pos = index
+                return index, SOURCES[index][0], SOURCES[index][1]
+        return None
+
+    def _advance_source(self) -> None:
+        self.rotation_pos = (self.source_index + 1) % len(SOURCES)
+
+    def _block_source(self, index: int, seconds: int) -> None:
+        self.block_until[index] = time.monotonic() + seconds
+
     async def _measure_loop(self) -> None:
         session = cloudflare.make_session(self.streams)
         self._session = session
@@ -167,44 +220,58 @@ class MonitorApp(App):
                     await asyncio.sleep(0.2)
                     continue
 
+                picked = self._pick_source()
+                if picked is None:
+                    now = time.monotonic()
+                    wait = int(max(5, min(30, min(self.block_until) - now)))
+                    self.phase = "Servidores limitados"
+                    self.resting = True
+                    self.mbps = 0.0
+                    await self._rest(wait)
+                    continue
+
+                index, name, url = picked
+                self.source_index = index
+                self.source_name = name
                 self.resting = False
                 self.phase = "Midiendo"
+
                 try:
-                    source_name, source_url = SOURCES[self.source_index]
                     transfer = await cloudflare.download(
                         session,
                         self.burst,
                         self.streams,
                         self._on_sample,
-                        source_url=source_url,
+                        source_url=url,
                     )
-                    self.source_name = source_name
                     self.throttled += transfer.throttled
                     if transfer.bytes_total <= 0:
                         if transfer.throttled:
-                            if self.source_index == 0 and len(SOURCES) > 1:
-                                self.source_index = 1
-                                self.source_name = SOURCES[1][0]
-                                self.phase = f"Cloudflare limito; usando {self.source_name}"
-                                await asyncio.sleep(1)
-                                continue
-                            self.cooldown = min(60, max(10, self.cooldown * 2))
-                            self.phase = "Limitado por Cloudflare"
-                            self.mbps = 0.0
-                            await self._rest(self.cooldown)
+                            self._block_source(index, 90 if index == 0 else 45)
+                            self._advance_source()
                             continue
-                        if self.source_index > 0 and transfer.errors:
-                            self.source_index = (self.source_index + 1) % len(SOURCES)
-                            self.source_name = SOURCES[self.source_index][0]
-                            self.phase = f"Cambiando a {self.source_name}"
-                            await asyncio.sleep(1)
+                        if transfer.errors:
+                            self._block_source(index, 30)
+                            self._advance_source()
                             continue
                         raise EngineError("sin datos")
+
                     self.bytes_total += transfer.bytes_total
                     self.measured_seconds += transfer.elapsed
                     self.cycles += 1
-                    self.cooldown = 0
                     self.last_error = ""
+                    if name not in self.sources_used:
+                        self.sources_used.append(name)
+                    self.history.append(
+                        {
+                            "time": datetime.now().strftime("%H:%M:%S"),
+                            "source": name,
+                            "mbps": transfer.bytes_total * 8.0 / transfer.elapsed / 1_000_000,
+                            "ping": self.ping,
+                        }
+                    )
+                    self.history_dirty = True
+                    self._advance_source()
                     await self._refresh_ping()
                 except asyncio.CancelledError:
                     raise
@@ -217,7 +284,7 @@ class MonitorApp(App):
                     continue
 
                 rest = self._current_rest()
-                if rest > 0:
+                if rest > 0 and not self._exiting:
                     self.phase = "Descansando"
                     self.resting = True
                     self.mbps = 0.0
@@ -238,6 +305,8 @@ class MonitorApp(App):
 
     async def _refresh_ping(self) -> None:
         if self._session is None:
+            return
+        if self.block_until[0] > time.monotonic():
             return
         try:
             stats = await probes.measure_latency(self._session, count=4, interval=0)
@@ -274,6 +343,8 @@ class MonitorApp(App):
         self._render_speed(tier)
         self._render_spark()
         self._render_cat(tier)
+        if self.history_dirty:
+            self._render_history()
         self._render_status()
 
     def _render_speed(self, tier: cat.CatTier) -> None:
@@ -301,11 +372,41 @@ class MonitorApp(App):
         text.append(f"\n{tier.label}", style=f"italic {tier.color}")
         self.query_one("#cat", Static).update(text)
 
+    def _render_history(self) -> None:
+        self.history_dirty = False
+        if not self.history:
+            content = Text(
+                "Historial de la sesion: esperando la primera medicion...",
+                style="dim",
+            )
+        else:
+            table = Table(
+                box=box.SIMPLE_HEAD,
+                expand=False,
+                pad_edge=False,
+                padding=(0, 1),
+                header_style="bold bright_blue",
+            )
+            table.add_column("Hora", style="dim", no_wrap=True)
+            table.add_column("Fuente", no_wrap=True)
+            table.add_column("Bajada", justify="right", no_wrap=True)
+            table.add_column("Ping", justify="right", no_wrap=True)
+            for entry in self.history:
+                ping = entry.get("ping")
+                table.add_row(
+                    entry["time"],
+                    entry["source"],
+                    metrics.format_mbps(entry["mbps"]),
+                    f"{ping:.0f} ms" if ping is not None else "--",
+                )
+            content = table
+        self.query_one("#history", Static).update(content)
+
     def _render_status(self) -> None:
         if self.paused:
             state = Text("PAUSADO", style="bold yellow")
-        elif self.phase.startswith("Limitado"):
-            state = Text("LIMITADO 429", style="bold yellow")
+        elif self.phase == "Servidores limitados":
+            state = Text("SERVIDORES EN ESPERA", style="bold yellow")
         elif self.resting:
             state = Text("DESCANSANDO", style="dim")
         elif self.phase == "Reintentando":
@@ -313,29 +414,32 @@ class MonitorApp(App):
         else:
             state = Text("MIDIENDO", style="bold green")
 
-        text = Text()
-        text.append_text(state)
         detail = (
             f"{self.burst}s sin descanso"
             if self.mode == "continuous"
             else f"{self.burst}s mide / {self.rest}s descansa"
         )
+        text = Text()
+        text.append_text(state)
         text.append(
             f"  ·  modo {MODE_LABELS[self.mode]} ({detail})"
-            f"  ·  {self.streams} streams  ·  {self.server}  ·  ciclo {self.cycles}",
+            f"  ·  fuente {self.source_index + 1}/{len(SOURCES)} {self.source_name}",
             style="dim",
         )
-        if self.source_index:
-            text.append(f"  ·  fuente {self.source_name}", style="yellow")
         text.append(
-            f"  ·  {metrics.human_bytes(self.bytes_total)}  ·  "
-            f"{format_duration(time.monotonic() - self.started)}",
+            f"\nciclos {self.cycles}  ·  {metrics.human_bytes(self.bytes_total)}"
+            f"  ·  {format_duration(time.monotonic() - self.started)}",
             style="dim",
         )
+
+        now = time.monotonic()
+        blocked = sum(1 for until in self.block_until if until > now)
+        if blocked:
+            text.append(f"  ·  {blocked} servidor(es) en espera", style="yellow")
+        if self.throttled:
+            text.append(f"  ·  429 x{self.throttled}", style="yellow")
         if self.errors:
             text.append(f"  ·  errores {self.errors}", style="yellow")
-        if self.throttled and self.source_index == 0:
-            text.append(f"  ·  429 x{self.throttled}", style="yellow")
         if self.last_error and self.phase == "Reintentando":
             text.append(f"\n{self.last_error[:70]}", style="red")
         self.query_one("#status", Static).update(text)
@@ -396,6 +500,8 @@ class MonitorApp(App):
             "bytes": self.bytes_total,
             "cycles": self.cycles,
             "errors": self.errors,
+            "throttled": self.throttled,
             "avg": self.bytes_total * 8.0 / measured / 1_000_000,
             "mode": self.mode,
+            "sources": list(self.sources_used),
         }

@@ -1,6 +1,7 @@
+import time
 import unittest
 
-from leotools.utils.speedtest import cat
+from leotools.utils.speedtest import cat, monitor
 
 
 class TierTests(unittest.TestCase):
@@ -48,6 +49,39 @@ class SparklineTests(unittest.TestCase):
         line = cat.sparkline([0, 50, 100], width=3)
         self.assertEqual(len(line), 3)
         self.assertEqual(line[-1], "█")
+
+
+class RotationTests(unittest.TestCase):
+    def test_round_robin(self):
+        app = monitor.MonitorApp(mode="cycle", streams=1)
+        index, name, _ = app._pick_source()
+        self.assertEqual(index, 0)
+        self.assertEqual(name, "Cloudflare")
+        app.source_index = index
+        app._advance_source()
+        index2, name2, _ = app._pick_source()
+        self.assertEqual(index2, 1)
+        self.assertEqual(name2, monitor.SOURCES[1][0])
+
+    def test_skips_blocked_source(self):
+        app = monitor.MonitorApp(mode="cycle", streams=1)
+        app.block_until[0] = time.monotonic() + 60
+        index, _, _ = app._pick_source()
+        self.assertEqual(index, 1)
+
+    def test_all_blocked_returns_none(self):
+        app = monitor.MonitorApp(mode="cycle", streams=1)
+        app.block_until = [time.monotonic() + 60 for _ in monitor.SOURCES]
+        self.assertIsNone(app._pick_source())
+
+
+class KeysTests(unittest.TestCase):
+    def test_legend_mentions_all_keys(self):
+        text = monitor.keys_text().plain
+        for key in ("Esc", "p", "m", "1", "2", "3"):
+            self.assertIn(key, text)
+        for label in ("salir", "pausar", "cambiar modo", "ciclico", "continuo", "muestreo"):
+            self.assertIn(label, text)
 
 
 if __name__ == "__main__":
