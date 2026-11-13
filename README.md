@@ -68,6 +68,7 @@ lt [comando] [opciones]
 | `lt jsoncmp` | Compara dos archivos JSON y muestra sus diferencias |
 | `lt speedtest` | Mide velocidad, latencia y bufferbloat de tu conexion |
 | `lt monitor` | Dashboard en vivo con medicion continua y gato animado |
+| `lt dash` | Sistema (CPU/RAM/temps) + Ethernet + Internet |
 | `lt db` | Bases de datos MySQL (import, export, drop, reset) |
 | `lt drop` | Borra los datos de las tablas e importa un `.sql` en un paso |
 | `lt code` | Abre VS Code con los proyectos (local + SSH) |
@@ -293,6 +294,58 @@ lt monitor --streams 6 --burst 6
 
 > `monitor` no guarda historial en disco: el historial es de la sesion actual.
 > El modo `continuous` puede descargar decenas de GB por hora.
+
+---
+
+### `lt dash`
+
+Dashboard tipo Glances que combina el estado del equipo con las pruebas de
+Internet en una sola pantalla.
+
+| Panel | Muestra |
+|-------|---------|
+| **CPU** | Uso, hilos y frecuencia |
+| **RAM** | Memoria usada/total y swap |
+| **Temperaturas** | CPU (LibreHardwareMonitor) y GPU NVIDIA (`nvidia-smi`) |
+| **Ethernet** | Interfaz activa, enlace, IP, bajada/subida en vivo, totales, errores |
+| **Disco** | Uso del disco del sistema |
+| **Internet** | Velocidad con rotacion de servidores, gato e historial |
+
+#### Temperaturas en Windows
+
+- **GPU NVIDIA**: se lee con `nvidia-smi` (no requiere instalar nada).
+- **CPU**: Windows no la expone por defecto. Ejecuta
+  [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)
+  en segundo plano para que `lt dash` la lea por WMI.
+- Si no esta disponible, el panel muestra `CPU n/d`.
+
+#### Teclas
+
+Las mismas que `lt monitor`: `Esc` salir, `p` pausa, `m` cambiar modo,
+`1/2/3` modo directo, `[`/`]` descanso.
+
+#### Opciones y ejemplos
+
+| Opcion | Descripcion |
+|--------|-------------|
+| `--mode, -m` | `cycle`, `continuous`, `sample` |
+| `--streams, -s` | Conexiones en paralelo (default: 4) |
+| `--burst, -b` | Segundos midiendo por ciclo |
+| `--rest, -r` | Segundos de descanso por ciclo |
+
+```bash
+# Dashboard completo
+lt dash
+
+# Sin descanso en las pruebas de Internet
+lt dash --mode continuous
+
+# Mas conexiones y bloques de 6s
+lt dash --streams 6 --burst 6
+```
+
+> La interfaz de red se detecta automaticamente y se excluyen adaptadores
+> virtuales (WSL, Hyper-V, loopback, Bluetooth).
 
 ---
 
@@ -531,6 +584,7 @@ LeoTools/
 │   ├── cli.py
 │   ├── commands/
 │   │   ├── code.py
+│   │   ├── dash.py
 │   │   ├── db.py
 │   │   ├── domicilios.py
 │   │   ├── drop.py
@@ -545,11 +599,13 @@ LeoTools/
 │   └── utils/
 │       ├── browser.py
 │       ├── files.py
+│       ├── sysmon.py
 │       └── speedtest/
 │           ├── __init__.py
 │           ├── cat.py
 │           ├── cloudflare.py
 │           ├── curl_engine.py
+│           ├── dash.py
 │           ├── engine.py
 │           ├── history.py
 │           ├── metrics.py
@@ -560,7 +616,8 @@ LeoTools/
 │           └── system.py
 ├── tests/
 │   ├── test_monitor_cat.py
-│   └── test_speedtest_metrics.py
+│   ├── test_speedtest_metrics.py
+│   └── test_sysmon.py
 ├── pyproject.toml
 ├── requirements.txt
 └── README.md
@@ -610,6 +667,7 @@ python -m unittest discover -s tests -v
 - [x] `lt jsoncmp` - Comparar dos archivos JSON
 - [x] `lt speedtest` - Medir velocidad, latencia y bufferbloat
 - [x] `lt monitor` - Dashboard en vivo con gato animado
+- [x] `lt dash` - Sistema, Ethernet e Internet en una pantalla
 - [x] `lt db` - Import/export/drop/reset de MySQL (XAMPP)
 - [x] `lt drop` - Borrar datos e importar un dump en un paso
 - [x] `lt code` - Abrir proyectos en VS Code (local + SSH)

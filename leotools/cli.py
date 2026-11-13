@@ -6,6 +6,7 @@ from rich.text import Text
 
 from leotools.commands import (
     code,
+    dash,
     db,
     domicilios,
     drop,
@@ -49,6 +50,7 @@ def show_guide():
         ("img2pdf", "Imagenes de la carpeta a PDF", "lt img2pdf -o clase.pdf"),
         ("speedtest", "Velocidad y bufferbloat", "lt speedtest --quick"),
         ("monitor", "Panel en vivo + gato", "lt monitor"),
+        ("dash", "Sistema + red + gato", "lt dash"),
         ("jsoncmp", "Diferencias entre dos JSON", "lt jsoncmp a.json b.json"),
         ("db", "MySQL: import / export", "lt db"),
         ("drop", "Borra datos e importa .sql", "lt drop tables -p x.sql"),
@@ -112,6 +114,11 @@ app.add_typer(
 app.add_typer(
     monitor.app,
     name="monitor",
+)
+
+app.add_typer(
+    dash.app,
+    name="dash",
 )
 
 app.add_typer(
