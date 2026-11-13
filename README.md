@@ -67,6 +67,7 @@ lt [comando] [opciones]
 | `lt img2pdf` | Convierte imagenes de la carpeta actual a un PDF |
 | `lt jsoncmp` | Compara dos archivos JSON y muestra sus diferencias |
 | `lt speedtest` | Mide velocidad, latencia y bufferbloat de tu conexion |
+| `lt monitor` | Dashboard en vivo con medicion continua y gato animado |
 | `lt db` | Bases de datos MySQL (import, export, drop, reset) |
 | `lt drop` | Borra los datos de las tablas e importa un `.sql` en un paso |
 | `lt code` | Abre VS Code con los proyectos (local + SSH) |
@@ -229,6 +230,55 @@ lt speedtest --min-down 300 --min-up 30
 
 El historial se guarda en `%LOCALAPPDATA%\LeoTools\speedtest.jsonl`
 (en Linux: `~/.local/share/leotools`), sin enviar nada a Internet.
+
+---
+
+### `lt monitor`
+
+Dashboard a pantalla completa que mide mientras esta abierto y anima un gato
+ASCII segun la velocidad de descarga. Al salir muestra el resumen de la sesion.
+
+| Modo | Comportamiento | Uso |
+|------|----------------|-----|
+| `cycle` | 4s midiendo / 6s descansando | Uso normal |
+| `continuous` | Mide sin descanso | Maximo real (consume mucho ancho de banda) |
+| `sample` | 3s cada 27s | Consumo minimo |
+
+Se puede cambiar de modo **en caliente** sin cerrar el panel.
+
+| Tecla | Accion |
+|-------|--------|
+| `Esc` / `Ctrl+C` | Salir y ver resumen |
+| `p` | Pausar / reanudar |
+| `m` | Cambiar de modo (ciclico → continuo → muestreo) |
+| `1` / `2` / `3` | Elegir modo directamente |
+| `[` / `]` | Menos / mas descanso |
+
+| Opcion | Descripcion |
+|--------|-------------|
+| `--mode, -m` | Modo inicial: `cycle`, `continuous`, `sample` |
+| `--streams, -s` | Conexiones en paralelo (default: 6) |
+| `--burst, -b` | Segundos midiendo por ciclo |
+| `--rest, -r` | Segundos de descanso por ciclo |
+
+#### Ejemplos
+
+```bash
+# Dashboard normal
+lt monitor
+
+# Sin descanso (ojo con el consumo)
+lt monitor --mode continuous
+
+# Muestreo ligero cada 27s
+lt monitor --mode sample
+
+# Mas conexiones y bloques de 6s
+lt monitor --streams 8 --burst 6
+```
+
+> `monitor` no guarda historial: esta pensado para observar en vivo.
+> El modo `continuous` puede descargar decenas de GB por hora.
 
 ---
 
@@ -475,6 +525,7 @@ LeoTools/
 │   │   ├── img2pdf.py
 │   │   ├── jsoncmp.py
 │   │   ├── mei.py
+│   │   ├── monitor.py
 │   │   ├── speedtest.py
 │   │   └── update.py
 │   └── utils/
@@ -482,16 +533,19 @@ LeoTools/
 │       ├── files.py
 │       └── speedtest/
 │           ├── __init__.py
+│           ├── cat.py
 │           ├── cloudflare.py
 │           ├── curl_engine.py
 │           ├── engine.py
 │           ├── history.py
 │           ├── metrics.py
 │           ├── models.py
+│           ├── monitor.py
 │           ├── probes.py
 │           ├── render.py
 │           └── system.py
 ├── tests/
+│   ├── test_monitor_cat.py
 │   └── test_speedtest_metrics.py
 ├── pyproject.toml
 ├── requirements.txt
@@ -541,6 +595,7 @@ python -m unittest discover -s tests -v
 - [x] `lt img2pdf` - Convertir imagenes a PDF
 - [x] `lt jsoncmp` - Comparar dos archivos JSON
 - [x] `lt speedtest` - Medir velocidad, latencia y bufferbloat
+- [x] `lt monitor` - Dashboard en vivo con gato animado
 - [x] `lt db` - Import/export/drop/reset de MySQL (XAMPP)
 - [x] `lt drop` - Borrar datos e importar un dump en un paso
 - [x] `lt code` - Abrir proyectos en VS Code (local + SSH)

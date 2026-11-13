@@ -14,6 +14,7 @@ from leotools.commands import (
     img2pdf,
     jsoncmp,
     mei,
+    monitor,
     speedtest,
     update,
 )
@@ -47,6 +48,7 @@ def show_guide():
     rows = [
         ("img2pdf", "Imagenes de la carpeta a PDF", "lt img2pdf -o clase.pdf"),
         ("speedtest", "Velocidad y bufferbloat", "lt speedtest --quick"),
+        ("monitor", "Panel en vivo + gato", "lt monitor"),
         ("jsoncmp", "Diferencias entre dos JSON", "lt jsoncmp a.json b.json"),
         ("db", "MySQL: import / export", "lt db"),
         ("drop", "Borra datos e importa .sql", "lt drop tables -p x.sql"),
@@ -105,6 +107,11 @@ app.command(name="jsoncmp")(jsoncmp.run)
 app.add_typer(
     speedtest.app,
     name="speedtest",
+)
+
+app.add_typer(
+    monitor.app,
+    name="monitor",
 )
 
 app.add_typer(
