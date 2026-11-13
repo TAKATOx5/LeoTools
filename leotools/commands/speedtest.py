@@ -78,12 +78,33 @@ async def run_test(
             result.down = await engine.download(
                 session, engine_name, duration, streams, dashboard.sample, family
             )
+            if result.down.bytes_total <= 0 and result.down.throttled:
+                for name, url in cloudflare.FALLBACK_SOURCES:
+                    dashboard.set_phase(f"Cloudflare limito; probando {name}...")
+                    candidate = await cloudflare.download(
+                        session,
+                        duration,
+                        streams,
+                        dashboard.sample,
+                        source_url=url,
+                    )
+                    if candidate.bytes_total > 0:
+                        result.down = candidate
+                        result.source = name
+                        dashboard.set_server(f"{name} (respaldo)")
+                        break
+                    result.down = candidate
         finally:
             stop.set()
             loaded_down = await loaded
         result.down_bloat = metrics.bufferbloat(result.idle, loaded_down)
 
-        if do_upload:
+        if do_upload and result.source != "Cloudflare":
+            dashboard.set_upload_enabled(False)
+            result.warnings.append(
+                "Subida omitida: Cloudflare esta limitando las peticiones (HTTP 429)."
+            )
+        elif do_upload:
             dashboard.set_phase("Midiendo subida...")
             stop = asyncio.Event()
             loaded = asyncio.create_task(
@@ -96,7 +117,13 @@ async def run_test(
             finally:
                 stop.set()
                 loaded_up = await loaded
-            result.up_bloat = metrics.bufferbloat(result.idle, loaded_up)
+            if result.up.bytes_total <= 0 and result.up.throttled:
+                result.up = None
+                result.warnings.append(
+                    "Subida omitida: Cloudflare limito las peticiones (HTTP 429)."
+                )
+            if result.up is not None:
+                result.up_bloat = metrics.bufferbloat(result.idle, loaded_up)
 
         dashboard.set_phase("Listo")
     finally:
@@ -116,6 +143,20 @@ def build_warnings(result: SpeedTestResult) -> list[str]:
                 f"{transfer.errors} conexion(es) fallaron durante la prueba; "
                 "el resultado puede ser mas bajo de lo real."
             )
+
+    throttled = sum(
+        transfer.throttled for transfer in (result.down, result.up) if transfer is not None
+    )
+    if result.source != "Cloudflare":
+        warnings.append(
+            f"Cloudflare limito las peticiones (HTTP 429); se uso {result.source} "
+            "como respaldo. La cifra no es directamente comparable con Cloudflare."
+        )
+    elif throttled:
+        warnings.append(
+            f"Cloudflare limito {throttled} peticiones (HTTP 429); "
+            "el resultado puede ser menor al real. Espera un momento y reintenta."
+        )
 
     link, vpn = system.detect_network()
     if vpn:
@@ -245,7 +286,7 @@ def main(
         )
         raise typer.Exit(1)
 
-    result.warnings = build_warnings(result)
+    result.warnings = build_warnings(result) + result.warnings
     if result.down is None or result.down.bytes_total == 0:
         console.print(
             Panel(

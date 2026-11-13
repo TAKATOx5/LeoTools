@@ -26,6 +26,7 @@ def to_record(result: SpeedTestResult) -> dict:
     return {
         "ts": result.started_at.isoformat(timespec="seconds"),
         "engine": result.engine,
+        "source": result.source,
         "down": round(down["avg"], 2),
         "up": round(up["avg"], 2),
         "down_peak": round(down["peak"], 2),

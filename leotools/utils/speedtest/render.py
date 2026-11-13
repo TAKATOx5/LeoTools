@@ -151,10 +151,10 @@ def render_result(
     table.add_column(justify="right", no_wrap=True)
     table.add_column()
 
-    server = Text("Cloudflare", style=f"bold {ACCENT}")
-    if result.colo:
+    server = Text(result.source, style=f"bold {ACCENT}")
+    if result.colo and result.source == "Cloudflare":
         server.append(f" · {result.colo}", style="bold")
-    if result.location:
+    if result.location and result.source == "Cloudflare":
         server.append(f" ({result.location})", style="dim")
     if result.ip:
         server.append(f" · {result.ip}", style="dim")
@@ -311,13 +311,20 @@ def render_history(records: list[dict], console: Console) -> None:
         delta = record.get("down_bloat")
         bloat_text = Text(f"{bloat} {float(delta or 0):+.0f}ms")
         bloat_text.stylize(metrics.grade_style(bloat))
+        source = record.get("source")
+        if source not in (None, "", "Cloudflare"):
+            server = str(source).replace(" US", "")
+        else:
+            server = record.get("colo") or "-"
+        up = float(record.get("up") or 0)
         table.add_row(
             history.format_timestamp(record.get("ts", "")),
             metrics.format_mbps(float(record.get("down") or 0)),
-            metrics.format_mbps(float(record.get("up") or 0)),
+            metrics.format_mbps(up) if up else "—",
             f"{float(record.get('ping') or 0):.1f} ms",
-            f"{float(record.get('jitter') or 0):.1f} ms",            bloat_text,
-            record.get("colo") or "-",
+            f"{float(record.get('jitter') or 0):.1f} ms",
+            bloat_text,
+            server,
         )
 
     console.print(
@@ -330,15 +337,15 @@ def render_history(records: list[dict], console: Console) -> None:
     )
 
     downs = [float(record.get("down") or 0) for record in records]
-    ups = [float(record.get("up") or 0) for record in records]
+    ups = [float(record.get("up") or 0) for record in records if float(record.get("up") or 0) > 0]
     summary = Text("Promedio: ", style="dim")
     summary.append(metrics.format_mbps(metrics.mean(downs)), style="green")
     summary.append(" / ", style="dim")
-    summary.append(metrics.format_mbps(metrics.mean(ups)), style="green")
+    summary.append(metrics.format_mbps(metrics.mean(ups)) if ups else "—", style="green")
     summary.append("   ·   Mejor: ", style="dim")
     summary.append(metrics.format_mbps(max(downs)), style="green")
     summary.append(" / ", style="dim")
-    summary.append(metrics.format_mbps(max(ups)), style="green")
+    summary.append(metrics.format_mbps(max(ups)) if ups else "—", style="green")
     console.print(summary)
     console.print(Text(f"Historial: {history.history_path()}", style="dim"))
 

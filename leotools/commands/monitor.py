@@ -57,7 +57,7 @@ def main(
     mode: MonitorMode = typer.Option(
         MonitorMode.cycle, "--mode", "-m", help="Modo inicial"
     ),
-    streams: int = typer.Option(6, "--streams", "-s", help="Conexiones en paralelo"),
+    streams: int = typer.Option(4, "--streams", "-s", help="Conexiones en paralelo"),
     burst: int = typer.Option(None, "--burst", "-b", help="Segundos midiendo"),
     rest: int = typer.Option(None, "--rest", "-r", help="Segundos de descanso"),
     help: bool = typer.Option(False, "??", help="Mostrar ayuda"),

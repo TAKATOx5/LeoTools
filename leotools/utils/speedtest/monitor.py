@@ -2,19 +2,23 @@
 
 import asyncio
 import time
+import traceback
 from contextlib import suppress
+from datetime import datetime
 
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Static
 
-from . import cat, cloudflare, metrics, probes
+from . import cat, cloudflare, history, metrics, probes
 from .models import EngineError
 
 MODES = ("cycle", "continuous", "sample")
 MODE_LABELS = {"cycle": "ciclico", "continuous": "continuo", "sample": "muestreo"}
 PRESETS = {"cycle": (4, 6), "continuous": (5, 0), "sample": (3, 27)}
+
+SOURCES = [("Cloudflare", None), *cloudflare.FALLBACK_SOURCES]
 
 
 def format_duration(seconds: float) -> str:
@@ -70,7 +74,7 @@ class MonitorApp(App):
     def __init__(
         self,
         mode: str = "cycle",
-        streams: int = 6,
+        streams: int = 4,
         burst: int | None = None,
         rest: int | None = None,
     ) -> None:
@@ -90,6 +94,11 @@ class MonitorApp(App):
         self.errors = 0
         self.bytes_total = 0
         self.measured_seconds = 0.0
+        self.throttled = 0
+        self.cooldown = 0
+        self.source_index = 0
+        self.source_name = SOURCES[0][0]
+        self.last_error = ""
         self.paused = False
         self.resting = False
         self.phase = "Iniciando"
@@ -126,6 +135,18 @@ class MonitorApp(App):
     def _current_rest(self) -> int:
         return 0 if self.mode == "continuous" else self.rest
 
+    def _log_error(self, context: str, exc: BaseException) -> None:
+        self.last_error = f"{type(exc).__name__}: {exc}"
+        try:
+            path = history.history_path().parent / "monitor.log"
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(
+                    f"{datetime.now().isoformat(timespec='seconds')} [{context}] "
+                    f"{self.last_error}\n{traceback.format_exc()}\n"
+                )
+        except OSError:
+            pass
+
     async def _measure_loop(self) -> None:
         session = cloudflare.make_session(self.streams)
         self._session = session
@@ -135,7 +156,8 @@ class MonitorApp(App):
                 colo = trace.get("colo", "")
                 self.server = f"Cloudflare {colo}".strip()
                 await self._refresh_ping()
-            except Exception:
+            except Exception as exc:
+                self._log_error("trace", exc)
                 self.server = "Sin conexion"
                 self.phase = "Reintentando"
 
@@ -148,18 +170,46 @@ class MonitorApp(App):
                 self.resting = False
                 self.phase = "Midiendo"
                 try:
+                    source_name, source_url = SOURCES[self.source_index]
                     transfer = await cloudflare.download(
-                        session, self.burst, self.streams, self._on_sample
+                        session,
+                        self.burst,
+                        self.streams,
+                        self._on_sample,
+                        source_url=source_url,
                     )
+                    self.source_name = source_name
+                    self.throttled += transfer.throttled
                     if transfer.bytes_total <= 0:
+                        if transfer.throttled:
+                            if self.source_index == 0 and len(SOURCES) > 1:
+                                self.source_index = 1
+                                self.source_name = SOURCES[1][0]
+                                self.phase = f"Cloudflare limito; usando {self.source_name}"
+                                await asyncio.sleep(1)
+                                continue
+                            self.cooldown = min(60, max(10, self.cooldown * 2))
+                            self.phase = "Limitado por Cloudflare"
+                            self.mbps = 0.0
+                            await self._rest(self.cooldown)
+                            continue
+                        if self.source_index > 0 and transfer.errors:
+                            self.source_index = (self.source_index + 1) % len(SOURCES)
+                            self.source_name = SOURCES[self.source_index][0]
+                            self.phase = f"Cambiando a {self.source_name}"
+                            await asyncio.sleep(1)
+                            continue
                         raise EngineError("sin datos")
                     self.bytes_total += transfer.bytes_total
                     self.measured_seconds += transfer.elapsed
                     self.cycles += 1
+                    self.cooldown = 0
+                    self.last_error = ""
                     await self._refresh_ping()
                 except asyncio.CancelledError:
                     raise
-                except Exception:
+                except Exception as exc:
+                    self._log_error("download", exc)
                     self.errors += 1
                     self.phase = "Reintentando"
                     self.mbps = 0.0
@@ -191,7 +241,8 @@ class MonitorApp(App):
             return
         try:
             stats = await probes.measure_latency(self._session, count=4, interval=0)
-        except Exception:
+        except Exception as exc:
+            self._log_error("ping", exc)
             return
         summary = metrics.summarize_latency(stats)
         if summary["count"]:
@@ -253,10 +304,12 @@ class MonitorApp(App):
     def _render_status(self) -> None:
         if self.paused:
             state = Text("PAUSADO", style="bold yellow")
+        elif self.phase.startswith("Limitado"):
+            state = Text("LIMITADO 429", style="bold yellow")
         elif self.resting:
             state = Text("DESCANSANDO", style="dim")
         elif self.phase == "Reintentando":
-            state = Text("SIN CONEXION", style="bold red")
+            state = Text("REINTENTANDO", style="bold red")
         else:
             state = Text("MIDIENDO", style="bold green")
 
@@ -272,6 +325,8 @@ class MonitorApp(App):
             f"  ·  {self.streams} streams  ·  {self.server}  ·  ciclo {self.cycles}",
             style="dim",
         )
+        if self.source_index:
+            text.append(f"  ·  fuente {self.source_name}", style="yellow")
         text.append(
             f"  ·  {metrics.human_bytes(self.bytes_total)}  ·  "
             f"{format_duration(time.monotonic() - self.started)}",
@@ -279,6 +334,10 @@ class MonitorApp(App):
         )
         if self.errors:
             text.append(f"  ·  errores {self.errors}", style="yellow")
+        if self.throttled and self.source_index == 0:
+            text.append(f"  ·  429 x{self.throttled}", style="yellow")
+        if self.last_error and self.phase == "Reintentando":
+            text.append(f"\n{self.last_error[:70]}", style="red")
         self.query_one("#status", Static).update(text)
 
     # ------------------------------------------------------------------ acciones

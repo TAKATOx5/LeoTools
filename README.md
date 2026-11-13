@@ -228,8 +228,10 @@ lt speedtest --history 10
 lt speedtest --min-down 300 --min-up 30
 ```
 
-El historial se guarda en `%LOCALAPPDATA%\LeoTools\speedtest.jsonl`
-(en Linux: `~/.local/share/leotools`), sin enviar nada a Internet.
+> Si Cloudflare limita las peticiones (HTTP 429), la prueba baja automaticamente
+> a un espejo (Hetzner US u OVH) y lo avisa en el resultado.
+> El historial se guarda en `%LOCALAPPDATA%\LeoTools\speedtest.jsonl`
+> (en Linux: `~/.local/share/leotools`), sin enviar nada a Internet.
 
 ---
 
@@ -278,6 +280,8 @@ lt monitor --streams 8 --burst 6
 ```
 
 > `monitor` no guarda historial: esta pensado para observar en vivo.
+> Si Cloudflare responde `429`, el panel cambia solo a un espejo (Hetzner/OVH)
+> y muestra `fuente ...` en la barra de estado.
 > El modo `continuous` puede descargar decenas de GB por hora.
 
 ---

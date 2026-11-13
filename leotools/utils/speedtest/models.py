@@ -25,6 +25,7 @@ class TransferResult:
     bytes_total: int = 0
     elapsed: float = 0.0
     errors: int = 0
+    throttled: int = 0
 
 
 @dataclass
@@ -51,6 +52,7 @@ class Bufferbloat:
 @dataclass
 class SpeedTestResult:
     engine: str = "cloudflare"
+    source: str = "Cloudflare"
     colo: str = ""
     ip: str = ""
     location: str = ""

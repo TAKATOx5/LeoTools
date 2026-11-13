@@ -16,8 +16,13 @@ UP_URL = f"{BASE}/__up"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LeoTools/0.1"
 CHUNK = 256 * 1024
-DOWNLOAD_REQUEST = 25_000_000
+DOWNLOAD_REQUEST = 50_000_000
 SAMPLE_INTERVAL = 0.1
+
+FALLBACK_SOURCES = [
+    ("Hetzner US", "https://ash-speed.hetzner.com/100MB.bin"),
+    ("OVH", "https://proof.ovh.net/files/100Mb.dat"),
+]
 
 
 def make_session(streams: int, family: int | None = None) -> aiohttp.ClientSession:
@@ -103,20 +108,29 @@ async def download(
     duration: float,
     streams: int,
     on_sample=None,
+    source_url: str | None = None,
 ) -> TransferResult:
     counter = _Counter()
     samples: list[tuple[float, int]] = []
     errors = 0
+    throttled = 0
     stop = asyncio.Event()
     deadline = time.perf_counter() + duration
 
     async def worker() -> None:
-        nonlocal errors
+        nonlocal errors, throttled
         while time.perf_counter() < deadline:
-            nonce = random.randint(0, 2**31)
-            url = DOWN_URL.format(bytes=DOWNLOAD_REQUEST, nonce=nonce)
+            if source_url:
+                url = source_url
+            else:
+                nonce = random.randint(0, 2**31)
+                url = DOWN_URL.format(bytes=DOWNLOAD_REQUEST, nonce=nonce)
             try:
                 async with session.get(url) as resp:
+                    if resp.status == 429:
+                        throttled += 1
+                        await asyncio.sleep(1.0)
+                        continue
                     if resp.status != 200:
                         raise EngineError(f"HTTP {resp.status}")
                     async for chunk in resp.content.iter_chunked(CHUNK):
@@ -148,6 +162,7 @@ async def download(
         bytes_total=counter.total,
         elapsed=elapsed,
         errors=errors,
+        throttled=throttled,
     )
 
 
@@ -160,12 +175,13 @@ async def upload(
     counter = _Counter()
     samples: list[tuple[float, int]] = []
     errors = 0
+    throttled = 0
     stop = asyncio.Event()
     deadline = time.perf_counter() + duration
     block = b"\0" * CHUNK
 
     async def worker() -> None:
-        nonlocal errors
+        nonlocal errors, throttled
         while time.perf_counter() < deadline:
             async def body():
                 while time.perf_counter() < deadline:
@@ -179,6 +195,10 @@ async def upload(
                     headers={"Content-Type": "application/octet-stream"},
                 ) as resp:
                     await resp.read()
+                    if resp.status == 429:
+                        throttled += 1
+                        await asyncio.sleep(1.0)
+                        continue
                     if resp.status != 200:
                         raise EngineError(f"HTTP {resp.status}")
             except asyncio.CancelledError:
@@ -206,4 +226,5 @@ async def upload(
         bytes_total=counter.total,
         elapsed=elapsed,
         errors=errors,
+        throttled=throttled,
     )

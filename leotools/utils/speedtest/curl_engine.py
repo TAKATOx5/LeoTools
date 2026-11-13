@@ -13,7 +13,7 @@ from .models import TransferResult
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 NULL_DEVICE = "NUL" if os.name == "nt" else "/dev/null"
 PAYLOAD_MB = 32
-DOWNLOAD_REQUEST = 25_000_000
+DOWNLOAD_REQUEST = 50_000_000
 
 
 def _family_flag(family: int | None) -> list[str]:
@@ -45,7 +45,7 @@ async def download(
 ) -> TransferResult:
     t0 = time.perf_counter()
     deadline = t0 + duration
-    state = {"bytes": 0, "errors": 0}
+    state = {"bytes": 0, "errors": 0, "throttled": 0}
     family_args = _family_flag(family)
 
     async def worker() -> None:
@@ -69,6 +69,9 @@ async def download(
                 code, size = out.split()[-2:]
                 if code in {"200", "100", "000"}:
                     state["bytes"] += int(size)
+                elif code == "429":
+                    state["throttled"] += 1
+                    await asyncio.sleep(1.0)
                 else:
                     state["errors"] += 1
             except (ValueError, IndexError):
@@ -86,6 +89,7 @@ async def download(
         bytes_total=state["bytes"],
         elapsed=elapsed,
         errors=state["errors"],
+        throttled=state["throttled"],
     )
 
 
@@ -94,7 +98,7 @@ async def upload(
 ) -> TransferResult:
     t0 = time.perf_counter()
     deadline = t0 + duration
-    state = {"bytes": 0, "errors": 0}
+    state = {"bytes": 0, "errors": 0, "throttled": 0}
     family_args = _family_flag(family)
 
     handle = tempfile.NamedTemporaryFile(suffix=".bin", delete=False)
@@ -125,6 +129,9 @@ async def upload(
                     code, size = out.split()[-2:]
                     if code in {"200", "100", "000"}:
                         state["bytes"] += int(size)
+                    elif code == "429":
+                        state["throttled"] += 1
+                        await asyncio.sleep(1.0)
                     else:
                         state["errors"] += 1
                 except (ValueError, IndexError):
@@ -148,4 +155,5 @@ async def upload(
         bytes_total=state["bytes"],
         elapsed=elapsed,
         errors=state["errors"],
+        throttled=state["throttled"],
     )
